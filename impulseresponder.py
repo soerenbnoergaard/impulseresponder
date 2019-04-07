@@ -1,6 +1,22 @@
+import matplotlib
+matplotlib.use("TkAgg")
+import tkinter as tk
+
 from numpy import *
 from matplotlib.pyplot import *
 from scipy import signal
+
+class Gui(tk.Frame):
+    def __init__(self, parent):
+        self.parent = parent
+        tk.Frame.__init__(self, parent)
+
+        tk.Label(self, text="Hello").pack()
+
+def _test_gui():
+    root = tk.Tk()
+    Gui(root).pack()
+    root.mainloop()
 
 f_sample = 48_000
 f_nyquist = f_sample/2
@@ -152,6 +168,7 @@ def _test_prbs():
 
 
 if __name__ == "__main__":
+    # _test_gui()
     # _test_prbs()
     main()
     legend()
