@@ -18,6 +18,7 @@ def main():
 
 def main_gui():
     root = tk.Tk()
+    root.title("Impulse Responder")
     Gui(root).pack(expand=True, fill=tk.BOTH)
     root.mainloop()
 
