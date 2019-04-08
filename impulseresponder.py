@@ -52,11 +52,10 @@ class ImpulseResponder(object):
     def prbs_generic(self, num_bits, seed, field_width, newbit_function):
         mask = int("1" * field_width, 2)
         a = seed
-        i = 1
         bits = []
         for _ in range(num_bits):
             newbit = newbit_function(a)
-            a = ((a << 1) | newbit) & mask;
+            a = ((a << 1) | newbit) & mask
             bits.append(newbit * 2 - 1) # NRZ sequence
         return bits
 
