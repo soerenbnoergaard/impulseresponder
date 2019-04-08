@@ -3,6 +3,7 @@ matplotlib.use("TkAgg")
 
 import numpy as np
 import tkinter as tk
+import sounddevice as sd
 import matplotlib.pyplot as plt
 
 from scipy import signal
@@ -22,7 +23,7 @@ def main_gui():
     Gui(root).pack(expand=True, fill=tk.BOTH)
     root.mainloop()
 
-class ImpulseResponder(object):
+class ImpulseResponderBase(object):
     def __init__(self, sample_rate_Hz):
         self.sample_rate_Hz = sample_rate_Hz
 
@@ -78,7 +79,7 @@ class ImpulseResponder(object):
     def analyze(self, impulse_response_length_s):
         # Estimate impulse response
         h = signal.correlate(self.y, self.x, "full")
-        h /= len(self.x) # TODO: Is this scaling correct?
+        # h /= len(self.x) # TODO: Is this scaling correct?
         h = h[len(h)//2:]
         h = h[0:int(impulse_response_length_s * self.sample_rate_Hz)]
 
@@ -87,6 +88,7 @@ class ImpulseResponder(object):
         # Estimate frequency response
         H = np.fft.fft(h)
         H = H[0:len(H)//2] 
+        # H /= max(H)
         f = np.linspace(0, self.sample_rate_Hz/2, len(H))
 
         # Store results
@@ -95,18 +97,54 @@ class ImpulseResponder(object):
         self.H = H
         self.f = f
 
-class ImpulseResponderSimulation(ImpulseResponder):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.b, self.a = signal.cheby1(4, 10, 10_000 / (self.sample_rate_Hz/2))
-
+class ImpulseResponderSimulation(ImpulseResponderBase):
     def measure(self, waveform_string):
+        b, a = signal.cheby1(4, 10, 10_000 / (self.sample_rate_Hz/2))
+
         x = self.get_waveform_data(waveform_string)
-        y = signal.lfilter(self.b, self.a, x)
+        y = signal.lfilter(b, a, x)
 
         # Store results
         self.x = x
         self.y = y
+
+class ImpulseResponderSoundcard(ImpulseResponderBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def measure(self, waveform_string):
+        sd.default.device = "Scarlett 2i2 USB: Audio"
+        sd.default.blocksize = 512
+        sd.default.samplerate = self.sample_rate_Hz
+        sd.default.channels = 1
+
+        x = np.array(self.get_waveform_data(waveform_string), dtype=float)
+        y = sd.playrec(np.hstack([
+            x,
+            x,
+            x,
+            np.zeros(int(0.2 * self.sample_rate_Hz)),
+        ]))
+        sd.wait()
+        y = y.T[0]
+        y = y[len(y)//2:]
+
+        # Locate x in y
+        R = abs(signal.correlate(y, x, "valid"))
+        start = np.argmax(R)
+
+        y = y[start:start+len(x)]
+
+        # Store results
+        self.x = x
+        self.y = y
+
+        # ny = np.arange(len(y))
+        # nx = np.arange(len(x))
+
+        # plt.plot(ny, y)
+        # plt.plot(nx + start, x)
+        # plt.show()
 
 class Var(object):
     def __init__(self):
@@ -118,6 +156,8 @@ class Gui(tk.Frame):
     def __init__(self, parent):
         self.parent = parent
         self.var = Var()
+
+        self.parent.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.var.sample_rate_Hz.set("48000")
         self.var.waveform.set("prbs15")
@@ -142,7 +182,7 @@ class Gui(tk.Frame):
 
         # INPUT
         tk.Label(fr_input, text="Sample rate [Hz]").grid(row=0, column=0)
-        tk.OptionMenu(fr_input, self.var.sample_rate_Hz, "48000", command=lambda x: self.on_update_input()).grid(row=0, column=1)
+        tk.OptionMenu(fr_input, self.var.sample_rate_Hz, "48000", "44100", command=lambda x: self.on_update_input()).grid(row=0, column=1)
         tk.Label(fr_input, text="Waveform").grid(row=1, column=0)
         tk.OptionMenu(fr_input, self.var.waveform, "prbs9", "prbs15", "prbs20", command=lambda x: self.on_update_input()).grid(row=1, column=1)
         tk.Button(fr_input, text="Save WAV", command=self.on_input_save_wav).grid(row=2, column=0, columnspan=2, sticky=tk.W+tk.E)
@@ -163,9 +203,12 @@ class Gui(tk.Frame):
         canvas.get_tk_widget().pack(fill=tk.BOTH, expand=1)
 
         self.on_update_input()
+    
+    def on_close(self):
+        self.parent.destroy()
 
     def on_measure(self):
-        self.meas = ImpulseResponderSimulation(float(self.var.sample_rate_Hz.get()))
+        self.meas = ImpulseResponderSoundcard(float(self.var.sample_rate_Hz.get()))
         self.meas.measure(self.var.waveform.get())
         self.on_update_output()
 
@@ -179,14 +222,15 @@ class Gui(tk.Frame):
         self.meas.analyze(float(self.var.impulse_response_length_s.get()))
 
         # Show results
-        # fig, (ax1, ax2) = plt.subplots(2, 1, figsize=[10, 7])
-
         self.fig.clear()
         ax1 = self.fig.add_subplot(2, 1, 1)
         ax2 = self.fig.add_subplot(2, 1, 2)
 
         ax1.plot(self.meas.t, self.meas.h)
-        ax2.plot(self.meas.f, 20*np.log10(abs(self.meas.H)))
+        ax2.semilogx(self.meas.f, 20*np.log10(abs(self.meas.H)))
+
+        ax1.grid(True, "both", "both")
+        ax2.grid(True, "both", "both")
 
         self.fig.tight_layout()
         self.fig.canvas.draw_idle()
