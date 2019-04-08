@@ -6,12 +6,77 @@ from numpy import *
 from matplotlib.pyplot import *
 from scipy import signal
 
+class Var(object):
+    def __init__(self):
+        self.sample_rate_Hz = tk.StringVar()
+        self.waveform = tk.StringVar()
+        self.impulse_response_length_s = tk.StringVar()
+
 class Gui(tk.Frame):
     def __init__(self, parent):
         self.parent = parent
+        self.var = Var()
+
+        self.var.sample_rate_Hz.set("48000")
+        self.var.waveform.set("prbs15")
+        self.var.impulse_response_length_s.set("1")
+
         tk.Frame.__init__(self, parent)
 
-        tk.Label(self, text="Hello").pack()
+        fr_input = tk.LabelFrame(self, text="Input")
+        fr_output = tk.LabelFrame(self, text="Output")
+        fr_plot = tk.LabelFrame(self, text="Plot")
+
+        # INPUT
+        tk.Label(fr_input, text="Sample rate [Hz]").grid(row=0, column=0)
+        tk.OptionMenu(fr_input, self.var.sample_rate_Hz, "48000", command=lambda x: self.on_update_inputs()).grid(row=0, column=1)
+        tk.Label(fr_input, text="Waveform").grid(row=1, column=0)
+        tk.OptionMenu(fr_input, self.var.waveform, "prbs9", "prbs15", "prbs20", command=lambda x: self.on_update_inputs()).grid(row=1, column=1)
+        tk.Button(fr_input, text="Save WAV", command=self.on_input_save_wav).grid(row=2, column=0, columnspan=2, sticky=tk.W+tk.E)
+
+        # OUTPUT
+        tk.Button(fr_output, text="Measure", command=self.on_measure).grid(row=0, column=0, columnspan=2, sticky=tk.W+tk.E)
+        tk.Label(fr_output, text="Impulse response").grid(row = 1, column=0, columnspan=2, sticky=tk.W+tk.E)
+        tk.Label(fr_output, text="Length [s]").grid(row=2, column=0)
+        e = tk.Entry(fr_output, textvariable=self.var.impulse_response_length_s)
+        e.grid(row=2, column=1)
+        e.bind("<Return>", lambda x: self.on_update_impulse_response_length())
+        tk.Button(fr_output, text="Save WAV", command=self.on_output_save_impulse_response_as_wav).grid(row=3, column=0, columnspan=2, sticky=tk.W+tk.E)
+
+        # FRAMES
+        fr_input.grid(row = 0, column = 0, sticky=tk.N)
+        fr_output.grid(row = 0, column = 1, sticky=tk.N)
+        fr_plot.grid(row = 1, column = 0, columnspan=2, sticky=tk.N)
+
+        self.on_update_inputs()
+
+    def on_measure(self):
+        print("Not implemented yet")
+
+    def on_input_save_wav(self):
+        print("Not implemented yet")
+
+    def on_update_inputs(self):
+        fs = float(self.var.sample_rate_Hz.get())
+        L = float(self.prbs_length(self.var.waveform.get()))
+
+        self.var.impulse_response_length_s.set(str(L / fs))
+
+    def on_update_impulse_response_length(self):
+        print("Not implemented yet")
+
+    def on_output_save_recording_as_wav(self):
+        print("Not implemented yet")
+
+    def on_output_save_impulse_response_as_wav(self):
+        print("Not implemented yet")
+
+    def prbs_length(self, s):
+        return {
+            "prbs9": 2**9-1,
+            "prbs15": 2**15-1,
+            "prbs20": 2**20-1,
+        }[s]
 
 def _test_gui():
     root = tk.Tk()
@@ -168,8 +233,8 @@ def _test_prbs():
 
 
 if __name__ == "__main__":
-    # _test_gui()
+    _test_gui()
     # _test_prbs()
-    main()
-    legend()
+    # main()
+    # legend()
     show()
